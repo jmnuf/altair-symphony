@@ -228,6 +228,89 @@ int needs_rebuild(string_t source_file, string_t output_file) {
 	return 0;
 }
 
+/**
+ * If directory doesn't exists, it attempts to create it.
+ * Does nothing if the directory exists.
+ *
+ * @param {char*} path of directory
+ * @returns {int} result code of mkdir system command
+ */
+int create_dir_if_missing(string_t dir_path) {
+	struct stat st = {0};
+	if (stat(dir_path, &st) != -1) {
+		return 0;
+	}
+#define MKDIR_ARR_LEN 3
+	char *mkdir_arr[MKDIR_ARR_LEN] = {
+		"mkdir \"",
+		dir_path,
+		"\""
+	};
+	char *mkdir_cmd = flatten_string(mkdir_arr, MKDIR_ARR_LEN);
+#undef MKDIR_ARR_LEN
+	SYS("%s\n", mkdir_cmd);
+	int result = system(mkdir_cmd);
+	free(mkdir_cmd);
+	return result;
+}
+
+/**
+ * If the directory exists, it attempts to delete it.
+ * Does nothing if the directory doesn't exist
+ * 
+ * @param {char*} path of directory
+ * @param {int} result code of rm system command
+ */
+int delete_dir_if_exists(string_t dir_path) {
+	struct stat st = {0};
+	if (stat(dir_path, &st) == -1) {
+		return 0;
+	}
+#define RM_ARR_LEN 3
+	char *arr[RM_ARR_LEN] = {
+		"rm -rf \"",
+		dir_path,
+		"\""
+	};
+	char *cmd = flatten_string(arr, RM_ARR_LEN);
+#undef RM_ARR_LEN
+	SYS("%s\n", cmd);
+	int result = system(cmd);
+	free(cmd);
+	return result;
+}
+
+/**
+ * If the file doesn't exist it attempts to create it,
+ * does nothing if it does exist
+ *
+ * @param {char*} path for file to create
+ */
+int create_file_if_missing(string_t file_path) {
+	FILE *f = fopen(file_path, "r");
+	if (f != NULL) {
+		fclose(f);
+		return 0;
+	}
+	SYS("touch \"%s\"\n", file_path);
+	f = fopen(file_path, "w");
+	if (f == NULL) {
+		return -1;
+	}
+	fclose(f);
+	return 0;
+}
+
+/**
+ * If the directory doesn't exist it attempts to create it.
+ * Does nothing if it does exist
+ *
+ * @param {char*} path for directory to create
+ * @returns {int} some result code surely
+ */
+int delete_file_if_exists(string_t file_path) {
+}
+
 #endif
 
 #endif
