@@ -44,7 +44,8 @@ string_t sword_order_compile(SwordOrder *order);
 string_t str_arr_flatten(string_t array[], int length);
 string_t str_arr_join(string_t array[], int length, string_t joiner);
 int str_ends_with(string_t str, string_t suffix);
-int needs_rebuild(string_t base_file, string_t output_file);
+
+int needs_rebuild(string_t source_file, string_t output_file);
 
 int create_dir_if_missing(string_t dir_path);
 int delete_dir_if_exists(string_t dir_path);
@@ -54,6 +55,7 @@ int delete_file_if_exists(string_t file_path);
 
 #ifdef ALTAIR_ORCHESTRATE
 #include <stdarg.h>
+#include <errno.h>
 
 SwordOrder sword_order_new() {
 	SwordOrder order = {0};
@@ -177,9 +179,9 @@ string_t str_arr_join(string_t arr[], int len, string_t joiner) {
 /**
  * Check if a string ends with a certain suffix
  *
- * @param {char* } string to check for suffix
- * @param {char* } suffix substring to look for
- * @returns {int} 0 if suffix not found and 1 if suffix found
+ * @param {char*} string to check for suffix
+ * @param {char*} suffix substring to look for
+ * @returns {int} 0(false) if suffix not found and 1(true) if suffix found
  */
 int str_ends_with(string_t str, char *suffix) {
 	size_t str_len = strlen(str);
@@ -188,6 +190,42 @@ int str_ends_with(string_t str, char *suffix) {
 		return 0;
 	}
 	return strncmp(str + str_len - suf_len, suffix, suf_len) == 0;
+}
+
+/**
+ * Check if a program needs to be rebuilt/recompiled based on a source file.
+ * This can be used for that amazing ability to build C programs using a C program!
+ * This code is definitely not mine, not sure where I took it from anymore tho
+ *
+ * @param {char*} source file path
+ * @param {char*} output file path
+ * @returns {int} 1 if build needed, 0 if no, -1 if error has occured
+ */
+int needs_rebuild(string_t source_file, string_t output_file) {
+	struct stat statbuf = {0};
+	if (stat(output_file, &statbuf) < 0) {
+		if (errno == ENOENT) return 1;
+		ERROR("Failed to stat output file: %s\n", output_file);
+		return -1;
+	}
+	int output_file_time = statbuf.st_mtime;
+
+	if (stat(source_file, &statbuf) < 0) {
+		if (errno == ENOENT) {
+			ERROR("Missing source file: %s\n", source_file);
+		} else {
+			ERROR("Failed to stat source file: %s\n", source_file);
+		}
+		return -1;
+	}
+	
+	int source_file_time = statbuf.st_mtime;
+	if (source_file_time > output_file_time) {
+		INFO("Source file has changed: %s\n", source_file);
+		return 1;
+	}
+
+	return 0;
 }
 
 #endif
