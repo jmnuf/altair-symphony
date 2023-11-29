@@ -37,15 +37,16 @@ typedef struct {
 } SwordOrderAppendResult;
 
 SwordOrder sword_order_new();
-SwordOrderAppendResult sword_order_append(SwordOrder *order, ...);
-#define SWORD_ORDER_APPEND(order, ...) sword_order_append(order, __VA_ARGS__, NULL)
+SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...);
+#define sword_order_append(order, ...) sword_order_append_va(order, __VA_ARGS__, NULL)
 string_t sword_order_compile(SwordOrder *order);
 
 string_t str_arr_flatten(string_t array[], int length);
 string_t str_arr_join(string_t array[], int length, string_t joiner);
 int str_ends_with(string_t str, string_t suffix);
 
-int needs_rebuild(string_t source_file, string_t output_file);
+int needs_rebuild(string_t output_file, int sources_count, string_t *source_files);
+void rebuild_self_if_needed(int input_files_c, string_t input_files_v[], int argc, string_t argv[]);
 
 int create_dir_if_missing(string_t dir_path);
 int delete_dir_if_exists(string_t dir_path);
@@ -67,7 +68,7 @@ SwordOrder sword_order_new() {
 	return order;
 }
 
-SwordOrderAppendResult sword_order_append(SwordOrder *order, ...) {
+SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...) {
 	va_list pieces;
 	va_start(pieces, order);
 
@@ -108,7 +109,7 @@ string_t sword_order_compile(SwordOrder *order) {
 /**
  * Flatten array to a single string with nothing between strings
  *
- * @param {char*} array of strings
+ * @param {char**} array of strings
  * @param {int} length of array
  * @returns {char*} A new string which requires to be freed
  */
@@ -197,35 +198,87 @@ int str_ends_with(string_t str, char *suffix) {
  * This can be used for that amazing ability to build C programs using a C program!
  * This code is definitely not mine, not sure where I took it from anymore tho
  *
- * @param {char*} source file path
  * @param {char*} output file path
+ * @param {int} source files count
+ * @param {char**} source files path
  * @returns {int} 1 if build needed, 0 if no, -1 if error has occured
  */
-int needs_rebuild(string_t source_file, string_t output_file) {
+int needs_rebuild(string_t output_file, int sources_count, string_t *source_files) {
 	struct stat statbuf = {0};
 	if (stat(output_file, &statbuf) < 0) {
-		if (errno == ENOENT) return 1;
+		if (errno == ENOENT) {
+			INFO("Output file not found. Build needed assumed");
+			return 1;
+		}
 		ERROR("Failed to stat output file: %s\n", output_file);
 		return -1;
 	}
 	int output_file_time = statbuf.st_mtime;
 
-	if (stat(source_file, &statbuf) < 0) {
-		if (errno == ENOENT) {
-			ERROR("Missing source file: %s\n", source_file);
-		} else {
-			ERROR("Failed to stat source file: %s\n", source_file);
+	for (int i = 0; i < sources_count; ++i) {
+		string_t source_file = source_files[i];
+		if (stat(source_file, &statbuf) < 0) {
+			if (errno == ENOENT) {
+				ERROR("Missing source file: %s\n", source_file);
+			} else {
+				ERROR("Failed to stat source file: %s\n", source_file);
+			}
+			return -1;
 		}
-		return -1;
-	}
-	
-	int source_file_time = statbuf.st_mtime;
-	if (source_file_time > output_file_time) {
-		INFO("Source file has changed: %s\n", source_file);
-		return 1;
+
+		int source_file_time = statbuf.st_mtime;
+		if (source_file_time > output_file_time) {
+			INFO("Source file has changed: %s\n", source_file);
+			return 1;
+		}
 	}
 
 	return 0;
+}
+
+void rebuild_self_if_needed(int input_files_c, string_t input_files_v[], int argc, string_t argv[]) {
+	string_t binary_path = argv[0];
+	int rebuild_needed = needs_rebuild(binary_path, input_files_c, input_files_v);
+	if (rebuild_needed < 0) {
+		INFO("Skipping rebuild check cause of error...");
+		return;
+	} else if (rebuild_needed == 0) {
+		return;
+	}
+	INFO("Rebuilding self...");
+	SwordOrder order = sword_order_new();
+	sword_order_append(&order, "gcc");
+
+	for (int i = 0; i < input_files_c; ++i) {
+		sword_order_append(&order, input_files_v[i]);
+	}
+
+	sword_order_append(&order, "-o", binary_path);
+
+	sword_order_compile(&order);
+
+	SYS("%s\n", order.compiled);
+	int result = system(order.compiled);
+
+	if (result != 0) {
+		ERROR("Failed to rebuild");
+		return;
+	}
+
+	free(order.pieces);
+	order.pieces_count = 0;
+	free(order.compiled);
+
+	INFO("Self has been rebuilt. Relaunching...");
+	
+	for (int i = 0; i < argc; ++i) {
+		sword_order_append(&order, argv[i]);
+	}
+
+	sword_order_compile(&order);
+	result = system(order.compiled);
+
+	exit(result);
 }
 
 /**
@@ -246,7 +299,7 @@ int create_dir_if_missing(string_t dir_path) {
 		dir_path,
 		"\""
 	};
-	char *mkdir_cmd = flatten_string(mkdir_arr, MKDIR_ARR_LEN);
+	char *mkdir_cmd = str_arr_flatten(mkdir_arr, MKDIR_ARR_LEN);
 #undef MKDIR_ARR_LEN
 	SYS("%s\n", mkdir_cmd);
 	int result = system(mkdir_cmd);
@@ -272,7 +325,7 @@ int delete_dir_if_exists(string_t dir_path) {
 		dir_path,
 		"\""
 	};
-	char *cmd = flatten_string(arr, RM_ARR_LEN);
+	char *cmd = str_arr_flatten(arr, RM_ARR_LEN);
 #undef RM_ARR_LEN
 	SYS("%s\n", cmd);
 	int result = system(cmd);
