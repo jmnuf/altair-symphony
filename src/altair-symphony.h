@@ -207,7 +207,7 @@ int needs_rebuild(string_t output_file, int sources_count, string_t *source_file
 	struct stat statbuf = {0};
 	if (stat(output_file, &statbuf) < 0) {
 		if (errno == ENOENT) {
-			INFO("Output file not found. Build needed assumed");
+			INFO("Output file not found. Build needed assumed\n");
 			return 1;
 		}
 		ERROR("Failed to stat output file: %s\n", output_file);
@@ -240,12 +240,12 @@ void rebuild_self_if_needed(int input_files_c, string_t input_files_v[], int arg
 	string_t binary_path = argv[0];
 	int rebuild_needed = needs_rebuild(binary_path, input_files_c, input_files_v);
 	if (rebuild_needed < 0) {
-		INFO("Skipping rebuild check cause of error...");
+		INFO("Skipping rebuild check cause of error...\n");
 		return;
 	} else if (rebuild_needed == 0) {
 		return;
 	}
-	INFO("Rebuilding self...");
+	INFO("Rebuilding self...\n");
 	SwordOrder order = sword_order_new();
 	sword_order_append(&order, "gcc");
 
@@ -261,7 +261,7 @@ void rebuild_self_if_needed(int input_files_c, string_t input_files_v[], int arg
 	int result = system(order.compiled);
 
 	if (result != 0) {
-		ERROR("Failed to rebuild");
+		ERROR("Failed to rebuild\n");
 		return;
 	}
 
@@ -269,7 +269,7 @@ void rebuild_self_if_needed(int input_files_c, string_t input_files_v[], int arg
 	order.pieces_count = 0;
 	free(order.compiled);
 
-	INFO("Self has been rebuilt. Relaunching...");
+	INFO("Self has been rebuilt. Relaunching...\n");
 	
 	for (int i = 0; i < argc; ++i) {
 		sword_order_append(&order, argv[i]);
