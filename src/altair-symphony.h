@@ -23,11 +23,16 @@
 
 #define MTALLOC(T) malloc(sizeof(T))
 
+#ifndef SWORD_ORDER_BASE_CAPACITY
+#	define SWORD_ORDER_BASE_CAPACITY 50
+#endif
+
 typedef char* string_t;
 
 typedef struct {
 	string_t *pieces;
 	int pieces_count;
+	int capacity;
 	string_t compiled;
 } SwordOrder;
 
@@ -36,10 +41,19 @@ typedef struct {
 	int success;
 } SwordOrderAppendResult;
 
+SwordOrder sword_order_new_with_capacity(int capacity);
 SwordOrder sword_order_new();
+
 SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...);
 #define sword_order_append(order, ...) sword_order_append_va(order, __VA_ARGS__, NULL)
-string_t sword_order_compile(SwordOrder *order);
+
+string_t sword_order_materialize(SwordOrder *order);
+#define sword_order_compile(order) sword_order_materialize(order)
+int sword_order_shoot(SwordOrder *order);
+#define sword_order_execute(order) sword_order_shoot(order)
+void sword_order_dematerialize(SwordOrder *order);
+#define sword_order_clear(order) sword_order_dematerialize(order)
+int sword_order_materialize_shoot_clean(SwordOrder *order);
 
 string_t str_arr_flatten(string_t array[], int length);
 string_t str_arr_join(string_t array[], int length, string_t joiner);
@@ -59,15 +73,24 @@ int delete_file_if_exists(string_t file_path);
 #include <errno.h>
 
 SwordOrder sword_order_new() {
+	return sword_order_new_with_capacity(SWORD_ORDER_BASE_CAPACITY);
+}
+SwordOrder sword_order_new_with_capacity(int starting_capacity) {
 	SwordOrder order = {0};
 
-	order.pieces = NULL;
 	order.pieces_count = 0;
+	order.capacity = starting_capacity;
+	order.pieces = malloc(sizeof(char[starting_capacity]));
 	order.compiled = NULL;
 
 	return order;
 }
 
+/**
+ * @param {SwordOrder*} order pointer to append to
+ * @param {...char*} variant arguments list of strings to append to the command
+ * @returns {SwordOrderAppendResult} object containing how many items were added and if it was succesful
+ */
 SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...) {
 	va_list pieces;
 	va_start(pieces, order);
@@ -78,16 +101,23 @@ SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...) {
 		.success = 1,
 	};
 
+	int capacity = order->capacity;
+
 	while((new_piece = va_arg(pieces, string_t)) != NULL) {
 		int new_size = order->pieces_count + 1;
-		string_t* new_ptr = realloc(order->pieces, new_size * sizeof(string_t));
-		if (new_ptr == NULL) {
-			va_end(pieces);
-			result.success = 0;
-			return result;
-		}
 
-		order->pieces = new_ptr;
+		if (new_size >= capacity) {
+			capacity = capacity + 10;
+			string_t* new_ptr = realloc(order->pieces, capacity * sizeof(string_t));
+			if (new_ptr == NULL) {
+				ERROR("Failed to allocate more memory for order pieces");
+				va_end(pieces);
+				result.success = 0;
+				return result;
+			}
+			order->pieces = new_ptr;
+			order->capacity = capacity;
+		}
 		order->pieces[order->pieces_count++] = new_piece;
 	}
 	va_end(pieces);
@@ -100,10 +130,55 @@ SwordOrderAppendResult sword_order_append_va(SwordOrder *order, ...) {
  * @param {SwordOrder*} order to compile
  * @returns {char*} the compiled code
  */
-string_t sword_order_compile(SwordOrder *order) {
+string_t sword_order_materialize(SwordOrder *order) {
 	string_t compiled = str_arr_join(order->pieces, order->pieces_count, " ");
 	order->compiled = compiled;
+	if (compiled == NULL) {
+		ERROR("Not enough faith and views to materialize this chorus of guns and swords\n\tCouldn't allocate memory when compiled SwordOrder");
+	}
 	return compiled;
+}
+
+/**
+ * Make the swords and guns work
+ * Execute compiled order using system
+ *
+ * @param {SwordOrder*} order to execute
+ * @returns {int} the result of the execution or -1 when the order isn't compiled
+ */
+int sword_order_shoot(SwordOrder *order) {
+	if (order->compiled == NULL) {
+		ERROR("Swords and guns haven't been materialized\n\tSwordOrder command hasn't been compiled. Remember to call sword_order_aim");
+		return -1;
+	}
+	char* command = order->compiled;
+	SYS("%s\n", command);
+	int result = system(command);
+	return result;
+}
+
+/**
+ * Execute compiled order using system
+ * Make the swords and guns advance
+ *
+ * @param {SwordOrder*} order to execute
+ * @returns {int} the result of the execution or -1 when the order isn't compiled
+ */
+void sword_order_dematerialize(SwordOrder *order) {
+	if (order->compiled != NULL) {
+		free(order->compiled);
+		order->compiled = NULL;
+	}
+	order->pieces_count = 0;
+}
+
+int sword_order_materialize_shoot_clean(SwordOrder *order) {
+	if (sword_order_materialize(order) == NULL) {
+		return -1;
+	}
+	int result = sword_order_shoot(order);
+	sword_order_dematerialize(order);
+	return result;
 }
 
 /**
