@@ -33,16 +33,18 @@
 #endif
 
 #ifndef COMPILER
-#define COMPILER
-#ifdef __GNUC__
-// Man's on linux or wsl or using cygwin (what I'm using don't attack me plz)
-const char *compiler = "gcc";
-#elif defined(__MINGW32__)
+#	define COMPILER
+#	ifdef __GNUC__
+#		if defined(__MINGW32__)
 // I don't know, this is the ming32 I have ok, cygwin sometimes don't work great but it's ok
 const char *compiler = "i686-w64-mingw32-gcc";
-#else
-#undef COMPILER
-#endif
+#		else
+// Man's on linux or wsl or using cygwin (what I'm using don't attack me plz)
+const char *compiler = "gcc";
+#		endif
+#	else
+#		undef COMPILER
+#	endif
 #endif
 
 typedef char* string_t;
