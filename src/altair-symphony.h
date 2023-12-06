@@ -53,13 +53,21 @@ typedef struct {
 	string_t *items;
 } StringList;
 
+// TODO: Write `str_list_new` implementation
+StringList str_list_new();
+StringList str_list_new_with_capacity(int capacity);
+
 typedef struct {
 	int length;
 	int capacity;
 	void **items;
 } VoidList;
 
-#define list_append_va(T, l, ...) \
+// TODO: Write `void_list_new` implementation
+VoidList void_list_new();
+VoidList void_list_new_with_capacity(int capacity);
+
+#define list_T_append_va(T, l, ...) \
 	do { \
 		int len = (l)->length, cap = (l)->capacity;\
 		va_list args;\
@@ -80,9 +88,9 @@ typedef struct {
 		}\
 		(l)->length = len;\
 	} while(0)
-#define list_append(T, l, ...) list_append_va(T, l, __VA_ARGS__, NULL)
+#define list_T_append(T, l, ...) list_T_append_va(T, l, __VA_ARGS__, NULL)
 
-#define str_list_append(l, ...) list_append(char*, l, __VA_ARGS__)
+#define str_list_append(l, ...) list_T_append(char*, l, __VA_ARGS__)
 
 typedef struct {
 	string_t *pieces;
@@ -115,11 +123,14 @@ string_t str_create_va(string_t first, ...);
 string_t str_arr_flatten(string_t array[], int length);
 string_t str_arr_join(string_t array[], int length, string_t joiner);
 int str_ends_with(string_t str, string_t suffix);
+// TODO: Write implemention for `str_starts_with`
+// int str_starts_with(string_t str, string_t prefix);
 
 int needs_rebuild(string_t output_file, int sources_count, string_t *source_files);
 void rebuild_if_needed_sources(int argc, string_t argv[], int sources_c, string_t sources_v[]);
 void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t source_file, int headers_c, string_t headers_v[]);
-void rebuild_if_needed_sources_with_headers(int argc, string_t argv[], int sources_c, string_t sources_v[], int headers_c, string_t headers_v[]);
+// TODO: Write implementation for `rebuild_if_needed_sources_with_headers`
+// void rebuild_if_needed_sources_with_headers(int argc, string_t argv[], int sources_c, string_t sources_v[], int headers_c, string_t headers_v[]);
 
 // NOTE: If you're using spaces in your directory or file name this will fail every time! This is a feature! Stop using spaces bozo
 #define REBUILD_SELF(argc, argv) \
@@ -158,7 +169,7 @@ void rebuild_if_needed_sources_with_headers(int argc, string_t argv[], int sourc
 			}\
 			old_bin[idx] = '\0';\
 			old_bin_path = old_bin; \
-			/* We assume windows so we use window's rename, iladies */\
+			/* TODO: Use actual `rename` function cause `ren` command fails if the new name exists already*/\
 			sword_order_append(&order, "ren");\
 		} else { \
 			const char *suffix = ".old";\
@@ -180,7 +191,7 @@ void rebuild_if_needed_sources_with_headers(int argc, string_t argv[], int sourc
 			binary_path = str_create(binary_path);\
 		}\
 	 \
-		sword_order_append(&order, compiler, __FILE__, "-o", binary_path); \
+		sword_order_append(&order, COMPILER, __FILE__, "-o", binary_path); \
 		int result = sword_order_materialize_shoot_clean(&order); \
 		\
 		if (result != 0) { \
@@ -321,7 +332,7 @@ string_t str_create_va(string_t first, ...) {
 	va_start(pieces, first);
 	string_t new_piece;
 
-	// TODO: Create a string list type for this case
+	// TODO: Use StringList type for this
 	SwordOrder order = sword_order_new_with_capacity(50);
 	sword_order_append(&order, first);
 
@@ -434,7 +445,6 @@ int needs_rebuild(string_t output_file, int sources_count, string_t *source_file
 	struct stat statbuf = {0};
 	if (stat(output_file, &statbuf) < 0) {
 		if (errno == ENOENT) {
-			INFO("Output file not found. Build needed assumed\n");
 			return 1;
 		}
 		ERROR("Failed to stat output file: %s\n", output_file);
@@ -455,7 +465,6 @@ int needs_rebuild(string_t output_file, int sources_count, string_t *source_file
 
 		int source_file_time = statbuf.st_mtime;
 		if (source_file_time > output_file_time) {
-			INFO("Source file has changed: %s\n", source_file);
 			return 1;
 		}
 	}
@@ -471,6 +480,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 		sword_order_append(&order, headers_v[i]);
 	}
 
+	// TODO: Check if the binary path was actually in quotes, curse at the user and look inside them
 #if defined(_WIN32) || defined(_WIN64)
 	if (strlen(binary_path) < 2 || binary_path[0] != '.' || binary_path[1] != '\\') {
 		if (binary_path[1] == '/') {
@@ -519,6 +529,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 
 	sword_order_clear(&order);
 	string_t old_bin_path;
+	// TODO: Remove the allocation of more memory, just use create it manually
 #if defined(_WIN32) || defined(_WIN64)
 	if (str_ends_with(binary_path, ".exe")) {
 		const string_t suffix = ".old";
@@ -557,7 +568,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 	free(old_bin_path);
 
 	// TODO: Don't header files sometimes require to be referenced by compiler like a lib thingy? IDK, IDK C bro
-	sword_order_append(&order, compiler, source_file, "-o", binary_path);
+	sword_order_append(&order, COMPILER, source_file, "-o", binary_path);
 	int result = sword_order_materialize_shoot_clean(&order);
 	if (result != 0) {
 		ERROR("Failed to rebuild");
@@ -591,16 +602,18 @@ void rebuild_if_needed_sources(int argc, string_t argv[], int sources_c, string_
 	SwordOrder order = sword_order_new();
 	// Move current binary to avoid issues
 	string_t old_bin_path;
+	// TODO: Re-use stuff in `rebuild_if_needed_source_with_headers` for handling windows cases properly
 	if (str_ends_with(binary_path, ".exe")) {
 		old_bin_path = str_create(binary_path, ".old.exe");
 	} else {
 		old_bin_path = str_create(binary_path, ".old");
 	}
+	// TODO: Use rename function instead of 'mv' command
 	sword_order_append(&order, "mv", binary_path, old_bin_path);
 	sword_order_materialize_shoot_clean(&order);
 	free(old_bin_path);
 
-	sword_order_append(&order, compiler);
+	sword_order_append(&order, COMPILER);
 
 	for (int i = 0; i < sources_c; ++i) {
 		sword_order_append(&order, sources_v[i]);
@@ -610,6 +623,7 @@ void rebuild_if_needed_sources(int argc, string_t argv[], int sources_c, string_
 
 	sword_order_compile(&order);
 
+	// TODO: Use `sword_order_materialize_shoot_clean` instead of this manual logging of things
 	SYS("%s\n", order.compiled);
 	int result = system(order.compiled);
 
@@ -646,6 +660,7 @@ int create_dir_if_missing(string_t dir_path) {
 	if (stat(dir_path, &st) != -1) {
 		return 0;
 	}
+	// TODO: Use a standard function instead of using 'mkdir' command
 #define MKDIR_ARR_LEN 3
 	char *mkdir_arr[MKDIR_ARR_LEN] = {
 		"mkdir \"",
@@ -672,6 +687,7 @@ int delete_dir_if_exists(string_t dir_path) {
 	if (stat(dir_path, &st) == -1) {
 		return 0;
 	}
+	// TODO: Use some standard function instead of using 'rm -rf' command
 #define RM_ARR_LEN 3
 	char *arr[RM_ARR_LEN] = {
 		"rm -rf \"",
@@ -710,6 +726,7 @@ int create_file_if_missing(string_t file_path) {
 /**
  * If the directory doesn't exist it attempts to create it.
  * Does nothing if it does exist
+ * @TODO: Implementation of `delete_file_if_exists` is missing
  *
  * @param {char*} path for directory to create
  * @returns {int} some result code surely
