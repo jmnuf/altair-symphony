@@ -170,8 +170,6 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 			}\
 			old_bin[idx] = '\0';\
 			old_bin_path = old_bin; \
-			/* TODO: Use actual `rename` function cause `ren` command fails if the new name exists already*/\
-			sword_order_append(&order, "ren");\
 		} else { \
 			const char *suffix = ".old";\
 			int suffix_len = strlen(suffix);\
@@ -180,11 +178,14 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 			sprintf(old_bin, "%s%s", binary_path, suffix);\
 			old_bin[new_len - 1] = '\0';\
 			old_bin_path = old_bin; \
-			/* We assume non-gamer so we use mv to move to rename */\
-			sword_order_append(&order, "mv", "-v");\
 		} \
-		sword_order_append(&order, binary_path, old_bin_path); \
-		sword_order_materialize_shoot_clean(&order); \
+		if (rename(binary_path, old_bin_path) == 0) {\
+			SYS("Renamed '%s' -> '%s'\n", binary_path, old_bin_path);\
+		} else { \
+			ERROR("Failed renaming '%s' to '%s'\n", binary_path, old_bin_path); \
+			INFO("Doing dangerous rebuild-relaunch attempt...\n"); \
+		} \
+		sword_order_dematerialize(&order); \
 		\
 		if (strlen(binary_path) < 2 || binary_path[0] != '.' || binary_path[1] != '/') {\
 			binary_path = str_create("./", binary_path);\
@@ -563,7 +564,8 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 	if (rename(binary_path, old_bin_path) == 0) {
 		SYS("Renamed '%s' -> '%s'\n", binary_path, old_bin_path);
 	} else {
-		ERROR("Failed renaming '%s' to '%s'\n\tDoing dangerous rebuild-relaunch attempt...\n", binary_path, old_bin_path);
+		ERROR("Failed renaming '%s' to '%s'\n", binary_path, old_bin_path);
+		INFO("Doing dangerous rebuild-relaunch attempt...\n");
 	}
 
 	free(old_bin_path);
