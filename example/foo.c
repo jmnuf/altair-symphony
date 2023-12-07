@@ -1,10 +1,5 @@
 #include <stdbool.h>
 
-#ifdef _WIN32
-#define COMPILER
-const char *compiler = "mingw32";
-#endif
-
 #define ALTAIR_ORCHESTRATE
 #include "../src/altair-symphony.h"
 
