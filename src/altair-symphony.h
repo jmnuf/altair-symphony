@@ -3,20 +3,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <stdarg.h>
 #include <errno.h>
-
-#if defined(_WIN32) || defined(_WIN64)
-	#include <direct.h>
-	#define GETCWD _getcwd
-#else
-	#include <unistd.h>
-	#define GETCWD getcwd
-#endif
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifndef __ALTAIR_SYMPHONY__
 #define __ALTAIR_SYMPHONY__
+
+#ifdef _WIN32
+#	include <direct.h>
+#	define getcwd _getcwd
+#	define stat _stat
+#else
+#	include <unistd.h>
+#endif
 
 #define STRINGIFY(...) #__VA_ARGS__
 #define DELAYED_STRINGIFY(...) STRINGIFY(__VA_ARGS__)
