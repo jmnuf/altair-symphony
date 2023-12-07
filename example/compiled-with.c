@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 	}
-	if (no_rebuild == 1) {
+	if (no_rebuild != 1) {
 		n_argv[argc] = "-nrb";
 		string_t headers[1] = {"./src/altair-symphony.h"};
 		rebuild_if_needed_source_with_headers(argc, n_argv, __FILE__, 1, headers);
