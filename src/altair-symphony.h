@@ -482,7 +482,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 	}
 
 	// TODO: Check if the binary path was actually in quotes, curse at the user and look inside them
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef _WIN32
 	if (strlen(binary_path) < 2 || binary_path[0] != '.' || binary_path[1] != '\\') {
 		if (binary_path[1] == '/') {
 			char bin_substr[strlen(binary_path) - 2 + 1];
@@ -500,7 +500,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 	} else {
 		binary_path = str_create(binary_path);
 	}
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef _WIN32
 	{
 		// Idk what is going on, windows being windows, but sometimes the .exe matters, sometimes it doesn't, I forgot how I setup me windows ごめんね
 		if (!str_ends_with(binary_path, ".exe")) {
@@ -531,7 +531,7 @@ void rebuild_if_needed_source_with_headers(int argc, string_t argv[], string_t s
 	sword_order_clear(&order);
 	string_t old_bin_path;
 	// TODO: Remove the allocation of more memory, just use create it manually
-#if defined(_WIN32) || defined(_WIN64)
+#ifdef _WIN32
 	if (str_ends_with(binary_path, ".exe")) {
 		const string_t suffix = ".old";
 		int suffix_len = strlen(suffix);
